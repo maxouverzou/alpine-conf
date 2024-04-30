@@ -33,8 +33,7 @@ DEVICE=$1
 MOUNTPOINT=/mnt
 
 BOOT_PART=${DEVICE}1
-SWAP_PART=${DEVICE}2
-ROOT_PART=${DEVICE}3
+ROOT_PART=${DEVICE}2
 
 apk add sfdisk btrfs-progs
 modprobe btrfs
@@ -42,12 +41,10 @@ modprobe btrfs
 # TODO: use GPT
 cat << EOF | sfdisk --quiet --label dos ${DEVICE}
 ${BOOT_PART}: start=1M,size=100M,bootable
-${SWAP_PART}: start=,size=32000M
 ${ROOT_PART}: start=
 EOF
 
 mkfs.vfat -F32 ${BOOT_PART}
-mkswap ${SWAP_PART}
 mkfs.btrfs ${ROOT_PART}
 
 # initialize subvolumes
