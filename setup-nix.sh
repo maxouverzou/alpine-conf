@@ -1,5 +1,8 @@
 #!/bin/sh
 set -e
+
+test ! -z $USERNAME
+
 apk add xz
-doas install -d -m755 -o $(id -u) -g $(id -g) /nix
-wget -qO- https://nixos.org/nix/install | sh
+install -d -m755 -o $(id -u $USERNAME) -g $(id -g $USERNAME) /nix
+wget -qO- https://nixos.org/nix/install | doas -u $USERNAME sh

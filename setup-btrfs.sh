@@ -1,69 +1,71 @@
 #!/bin/sh
 set -e
-DEVICE=$1
 
-MOUNTPOINT=/mnt
+test ! -z $DEVICE
+test ! -z $USERNAME
 
-BOOT_PART=${DEVICE}1
-ROOT_PART=${DEVICE}2
+mountpoint=/mnt
+
+boot_part=${DEVICE}1
+root_part=${DEVICE}2
 
 apk add sfdisk btrfs-progs
 modprobe btrfs
 
-cat << EOF | sfdisk --quiet --label gpt ${DEVICE}
-${BOOT_PART}: start=1M,size=100M,bootable
-${ROOT_PART}: start=
-EOF
+cat << eof | sfdisk --quiet --label gpt $DEVICE
+$boot_part: start=1m,size=100m,bootable
+$root_part: start=
+eof
 
-mkfs.vfat -F32 ${BOOT_PART}
-mkfs.btrfs ${ROOT_PART}
+mkfs.vfat -f32 ${boot_part}
+mkfs.btrfs ${root_part}
 
 # initialize subvolumes
 
-mount -t btrfs ${ROOT_PART} ${MOUNTPOINT}
+mount -t btrfs ${root_part} ${mountpoint}
 
 # see https://www.jwillikers.com/btrfs-layout
 
-btrfs subvolume create ${MOUNTPOINT}/@
-btrfs subvolume create ${MOUNTPOINT}/@home
-btrfs subvolume create ${MOUNTPOINT}/@var
-btrfs subvolume create ${MOUNTPOINT}/@snapshots
-btrfs subvolume create ${MOUNTPOINT}/@swap
+btrfs subvolume create $mountpoint/@
+btrfs subvolume create $mountpoint/@home
+btrfs subvolume create $mountpoint/@var
+btrfs subvolume create $mountpoint/@snapshots
+btrfs subvolume create $mountpoint/@swap
 
-btrfs subvolume create ${MOUNTPOINT}/@home/$USERNAME
-btrfs subvolume create ${MOUNTPOINT}/@home/$USERNAME/.cache
-btrfs subvolume create ${MOUNTPOINT}/@home/$USERNAME/.local
-btrfs subvolume create ${MOUNTPOINT}/@home/$USERNAME/.var
-btrfs subvolume create ${MOUNTPOINT}/@home/$USERNAME/@snapshots
-btrfs subvolume create ${MOUNTPOINT}/@home/$USERNAME/Downloads
-btrfs subvolume create ${MOUNTPOINT}/@home/$USERNAME/Development
-btrfs subvolume create ${MOUNTPOINT}/@home/$USERNAME/Development/@snapshots
+btrfs subvolume create $mountpoint/@home/$USERNAME
+btrfs subvolume create $mountpoint/@home/$USERNAME/.cache
+btrfs subvolume create $mountpoint/@home/$USERNAME/.local
+btrfs subvolume create $mountpoint/@home/$USERNAME/.var
+btrfs subvolume create $mountpoint/@home/$USERNAME/@snapshots
+btrfs subvolume create $mountpoint/@home/$USERNAME/downloads
+btrfs subvolume create $mountpoint/@home/$USERNAME/development
+btrfs subvolume create $mountpoint/@home/$USERNAME/development/@snapshots
 
-umount ${MOUNTPOINT}
+umount $mountpoint
 
-mount -o subvol=@ ${ROOT_PART} ${MOUNTPOINT}
+mount -o subvol=@ $root_part $mountpoint
 
 mkdir -p \
- ${MOUNTPOINT}/boot \
- ${MOUNTPOINT}/home \
- ${MOUNTPOINT}/var \
- ${MOUNTPOINT}/.snapshots
+ $mountpoint/boot \
+ $mountpoint/home \
+ $mountpoint/var \
+ $mountpoint/.snapshots
 
-mount -t vfat ${BOOT_PART} ${MOUNTPOINT}/boot
+mount -t vfat $boot_part $mountpoint/boot
 
-mount -o subvol=@home ${ROOT_PART} ${MOUNTPOINT}/home
-mount -o subvol=@var ${ROOT_PART} ${MOUNTPOINT}/var
-mount -o subvol=@snapshots ${ROOT_PART} ${MOUNTPOINT}/.snapshots
+mount -o subvol=@home $root_part $mountpoint/home
+mount -o subvol=@var $root_part $mountpoint/var
+mount -o subvol=@snapshots $root_part $mountpoint/.snapshots
 
-mount -o subvol=@home/$USERNAME $ROOT_PART $MOUNTPOINT/home/$USERNAME
-mount -o subvol=@home/$USERNAME/.cache $ROOT_PART $MOUNTPOINT/home/$USERNAME/.cache
-mount -o subvol=@home/$USERNAME/.local $ROOT_PART $MOUNTPOINT/home/$USERNAME/.local
-mount -o subvol=@home/$USERNAME/.var $ROOT_PART $MOUNTPOINT/home/$USERNAME/.var
-mount -o subvol=@home/$USERNAME/@snapshots $ROOT_PART $MOUNTPOINT/home/$USERNAME/@snapshots
-mount -o subvol=@home/$USERNAME/Downloads $ROOT_PART $MOUNTPOINT/home/$USERNAME/Downloads
-mount -o subvol=@home/$USERNAME/Development $ROOT_PART $MOUNTPOINT/home/$USERNAME/Development
-mount -o subvol=@home/$USERNAME/Development/@snapshots $ROOT_PART $MOUNTPOINT/home/$USERNAME/Development/@snapshots
+mount -o subvol=@home/$USERNAME $root_part $mountpoint/home/$USERNAME
+mount -o subvol=@home/$USERNAME/.cache $root_part $mountpoint/home/$USERNAME/.cache
+mount -o subvol=@home/$USERNAME/.local $root_part $mountpoint/home/$USERNAME/.local
+mount -o subvol=@home/$USERNAME/.var $root_part $mountpoint/home/$USERNAME/.var
+mount -o subvol=@home/$USERNAME/@snapshots $root_part $mountpoint/home/$USERNAME/@snapshots
+mount -o subvol=@home/$USERNAME/downloads $root_part $mountpoint/home/$USERNAME/downloads
+mount -o subvol=@home/$USERNAME/development $root_part $mountpoint/home/$USERNAME/development
+mount -o subvol=@home/$USERNAME/development/@snapshots $root_part $mountpoint/home/$USERNAME/development/@snapshots
 
-setup-disk $MOUNTPOINT
+BOOTLOADER=grub setup-disk -v $mountpoint
 
 echo "MBR setup command: dd bs=440 conv=notrunc count=1 if=/usr/share/syslinux/gptmbr.bin of=$DEVICE"
