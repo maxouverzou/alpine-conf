@@ -1,0 +1,44 @@
+#!/bin/execlineb
+
+define counter 1
+
+define generations ./generations
+
+foreground {
+    backtick -E date {
+        date -u +%Y-%m-%d
+    }
+    backtick -E next {
+        backtick -E previous {
+            backtick -E read_previous {
+                pipeline { ls -1 ${generations} }
+                pipeline { sort --reverse --human-numeric-sort }
+                pipeline { head -n1 }
+                cut -d@ -f1
+            }
+            define previous ${read_previous}
+            ifelse { test -z ${previous} } {
+                echo 0
+            }
+            echo ${previous}
+        }
+        define previous_generation_id ${previous}
+        pipeline { echo 1+${previous_generation_id} }
+        bc
+    }
+
+    define new_generation ${next}@${date}
+    # echo ${new_generation}
+
+    backtick -E test {
+        foreground {
+            pipeline { ./plop.sh }
+            tr '[:lower:]' '[:upper:]'
+        }
+    }
+    define test ${test}
+    echo ${test}
+
+}
+
+

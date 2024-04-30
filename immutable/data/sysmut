@@ -1,0 +1,58 @@
+#!/bin/execlineb -W
+unshare --mount
+importas -D 0 source 1
+define mnt /media/root
+if { mkdir -p ${mnt} }
+if { mount -t btrfs -o rw,noatime UUID=b9ff5e7b-e128-4e64-861a-2fdd794a9828 ${mnt} }
+foreground {
+	backtick -E dt {
+		date -u +%Y%m%d%H%M%S
+	}
+	backtick -E rnd {
+		pipeline { cat /dev/urandom }
+		pipeline { tr -dc a-zA-Z }
+		pipeline { fold -w 8 }
+		head -n 1
+	}
+	define newsnap ${dt}${rnd}
+	if { mkdir -p ${mnt}/snapshots/${newsnap} }
+	if { btrfs subvolume snapshot ${mnt}/current/${source}/@ ${mnt}/snapshots/${newsnap}/@ }
+	if {
+		redirfd -w 1 ${mnt}/snapshots/${newsnap}/@/etc/fstab
+			sed s#CURRENT_SNAPSHOTS_PATH#/snapshots/${newsnap}#g ${mnt}/fstab
+	}
+	if { mount -t proc none ${mnt}/snapshots/${newsnap}/@/proc }
+	if { mount -t sysfs sys ${mnt}/snapshots/${newsnap}/@/sys }
+	if { mount -o bind,ro /dev ${mnt}/snapshots/${newsnap}/@/dev }
+	foreground {
+		foreground { mount -o bind,ro /etc/resolv.conf ${mnt}/snapshots/${newsnap}/@/etc/resolv.conf }
+		foreground {
+			chroot ${mnt}/snapshots/${newsnap}/@
+			foreground { mount -a }
+			foreground { sh }
+			importas apply ?
+			foreground { umount -a }
+			exit ${apply}
+		}
+		importas apply ?
+		foreground { redirfd -w 2 /dev/null umount ${mnt}/snapshots/${newsnap}/@/etc/resolv.conf }
+		ifelse { exit ${apply} } {
+			if { btrfs property set -ts ${mnt}/snapshots/${newsnap}/@ ro true }
+			define newlink ${dt}${rnd}
+			if { mkdir -p ${mnt}/links/${newlink} }
+			if { ln -s ../../snapshots/${newsnap} ${mnt}/links/${newlink}/0 }
+			if { cp -P ${mnt}/current/0 ${mnt}/links/${newlink}/1 }
+			if { cp -P ${mnt}/current/1 ${mnt}/links/${newlink}/2 }
+			if { cp -P ${mnt}/current/2 ${mnt}/links/${newlink}/3 }
+			if { mkdir -p ${mnt}/next }
+			if { ln -sfn ./links/${newlink} ${mnt}/next/current }
+			if { mv ${mnt}/next/current ${mnt}/ }
+			echo "Changes applied"
+		}
+		echo "Changes discarded"
+	}
+	foreground { redirfd -w 2 /dev/null umount ${mnt}/snapshots/${newsnap}/@/proc }
+	foreground { redirfd -w 2 /dev/null umount ${mnt}/snapshots/${newsnap}/@/sys }
+	redirfd -w 2 /dev/null umount ${mnt}/snapshots/${newsnap}/@/dev
+}
+umount ${mnt}

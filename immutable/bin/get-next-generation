@@ -1,0 +1,11 @@
+#!/bin/sh
+set -e
+
+LAST=$(get-last-generation | cut -d@ -f1)
+
+if [ -z ${LAST} ];
+then
+    LAST=0
+fi
+
+echo $(bc <<< "1+${LAST}")@$(date -u +%Y-%m-%d)

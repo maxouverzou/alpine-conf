@@ -1,0 +1,28 @@
+#!/bin/sh
+
+CHROOT_DIR=/media/root
+
+mkdir -p $CHROOT_DIR
+mount -t zfs rw,noatime UUID=1234 $CHROOT_DIR
+
+mount -v -t proc none $CHROOT_DIR/proc
+mount -v --rbind /sys $CHROOT_DIR/sys
+mount --make-rprivate $CHROOT_DIR/sys
+mount -v --rbind /dev $CHROOT_DIR/dev
+mount --make-rprivate $CHROOT_DIR/dev
+
+mount -o bind,ro /etc/resolv.conf $CHROOT_DIR/etc/resolv.conf
+
+chroot $CHROOT_DIR /bin/ash -l
+
+if [ $? -eq 0 ]
+then
+    zfs snapshot -r $(get-next-generation)
+    # update grub
+fi
+
+umount $CHROOT_DIR/etc/resolv.conf
+umount $CHROOT_DIR/proc
+umount $CHROOT_DIR/sys
+umount $CHROOT_DIR/dev
+umount $CHROOT_DIR

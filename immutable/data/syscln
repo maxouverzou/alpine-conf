@@ -1,0 +1,45 @@
+#!/bin/execlineb -W
+unshare --mount
+define mnt /media/root
+if { mkdir -p ${mnt} }
+if { mount -t btrfs -o rw,noatime,compress=zstd:3 UUID=b9ff5e7b-e128-4e64-861a-2fdd794a9828 ${mnt} }
+foreground {
+	foreground {
+		pipeline {
+			foreground {
+				pipeline {
+					find -H ${mnt}/snapshots/ -maxdepth 1 -mindepth 1 -print0
+				}
+				xargs -0 -r realpath
+			}
+			pipeline {
+				find -H ${mnt}/current/ -maxdepth 1 -mindepth 1 -print0
+			}
+			xargs -0 -r realpath
+		}
+		pipeline { tr \\n \\0 }
+		pipeline { sort -z }
+		pipeline { uniq -u -z }
+		pipeline { xargs -0 -r -n 1 -I [] find -H [] -maxdepth 1 -mindepth 1 -print0 }
+		xargs -0 -r btrfs subvolume delete
+	}
+	foreground { find -H ${mnt}/snapshots/ -maxdepth 1 -mindepth 1 -empty -type d -delete }
+	foreground {
+		pipeline {
+			foreground {
+				pipeline {
+					find -H ${mnt}/links/ -maxdepth 1 -mindepth 1 -print0
+				}
+				xargs -0 -r realpath
+			}
+			realpath ${mnt}/current
+		}
+		pipeline { tr \\n \\0 }
+		pipeline { sort -z }
+		pipeline { uniq -u -z }
+		pipeline { xargs -0 -r -n 1 -I [] find -H [] -maxdepth 1 -mindepth 1 -print0 }
+		xargs -0 -r -n 1 unlink
+	}
+	find -H ${mnt}/links/ -maxdepth 1 -mindepth 1 -empty -type d -delete
+}
+umount ${mnt}
