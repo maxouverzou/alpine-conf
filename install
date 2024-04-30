@@ -15,10 +15,8 @@ esac
 
 cat << 'EOF' | sh
     set -e
-    REPOSITORY=alpine-conf
     cd $(mktemp -d)
-    wget -qO- https://github.com/maxouverzou/$REPOSITORY/archive/refs/heads/master.tar.gz | tar -xzf-
-    cd $REPOSITORY
+    wget -qO- https://github.com/maxouverzou/alpine-conf/archive/refs/heads/master.tar.gz | tar --strip-components 1 -xzf-
     sh ./$script
 EOF
 
