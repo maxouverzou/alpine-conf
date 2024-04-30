@@ -3,6 +3,6 @@ let
 in pkgs.mkShell {
   packages = with pkgs; [
     execline
-    busybox
+    # busybox
   ];
 }

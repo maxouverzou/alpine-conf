@@ -9,6 +9,6 @@ setup-ntp busybox
 
 echo "Enter block device name: "
 read device
-USERNAME=${USERNAME:-maxou} ./setup-btrfs.sh $device
+sh ./setup-btrfs.sh $device
 
 echo "Reboot when ready"

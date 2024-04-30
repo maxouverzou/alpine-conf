@@ -10,8 +10,7 @@ ROOT_PART=${DEVICE}2
 apk add sfdisk btrfs-progs
 modprobe btrfs
 
-# TODO: use GPT
-cat << EOF | sfdisk --quiet --label dos ${DEVICE}
+cat << EOF | sfdisk --quiet --label gpt ${DEVICE}
 ${BOOT_PART}: start=1M,size=100M,bootable
 ${ROOT_PART}: start=
 EOF

@@ -1,0 +1,23 @@
+#!/bin/sh 
+
+case $1 in
+    "initial-setup")
+        script=initial-setup.sh
+        ;;
+    "post-reboot-setup")
+        script=post-reboot-setup.sh
+        ;;
+    *)
+        echo "Expected either --initial-setup or --post-reboot-setup"
+        exit 1
+        ;;
+esac
+
+cat << 'EOF' | sh
+    REPOSITORY=alpine-conf
+    cd $(mktemp -d)
+    wget -qO- https://github.com/maxouverzou/$REPOSITORY/archive/refs/heads/master.tar.gz | tar -xzf-
+    cd $REPOSITORY
+    sh ./$script
+EOF
+
