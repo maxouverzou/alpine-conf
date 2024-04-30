@@ -9,8 +9,6 @@ passwd -d root
 setup-sshd openssh
 setup-ntp busybox
 
-echo "Enter block device name: "
-read device
-sh ./setup-btrfs.sh $device
+sh ./setup-btrfs.sh $DEVICE
 
 echo "Reboot when ready"
