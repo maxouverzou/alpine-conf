@@ -1,3 +1,5 @@
+#!/bin/sh
+set -e
 setup-keymap us us
 setup-hostname localhost
 setup-interfaces -a -r

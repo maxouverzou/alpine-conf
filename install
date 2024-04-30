@@ -14,6 +14,7 @@ case $1 in
 esac
 
 cat << 'EOF' | sh
+    set -e
     REPOSITORY=alpine-conf
     cd $(mktemp -d)
     wget -qO- https://github.com/maxouverzou/$REPOSITORY/archive/refs/heads/master.tar.gz | tar -xzf-

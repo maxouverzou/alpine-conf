@@ -1,5 +1,5 @@
-set -xe
-# ROOTFS=btrfs VARFS=btrfs setup-disk -L -m sys /dev/vda
+#!/bin/sh
+set -e
 DEVICE=$1
 
 MOUNTPOINT=/mnt
