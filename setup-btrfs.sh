@@ -1,32 +1,4 @@
 set -xe
-
-create_subvolumes() {
-	local prefix=$1
-    local volume_prefix=@${prefix:1}
-
-    shift
-
-    for volume in $@
-    do
-        btrfs subvolume create $volume_prefix$volume
-    done
-}
-
-mount_subvolumes() {
-    local partition=$1
-	local prefix=$2
-    local volume_prefix=@${prefix:1}
-
-    shift
-    shift
-
-    for volume in $@
-    do
-        mkdir -p $prefix$volume
-        mount -o subvol=$volume_prefix$volume $partition $prefix$volume
-    done
-}
-
 # ROOTFS=btrfs VARFS=btrfs setup-disk -L -m sys /dev/vda
 DEVICE=$1
 
@@ -48,78 +20,51 @@ mkfs.vfat -F32 ${BOOT_PART}
 mkfs.btrfs ${ROOT_PART}
 
 # initialize subvolumes
-# see https://www.jwillikers.com/btrfs-layout
 
 mount -t btrfs ${ROOT_PART} ${MOUNTPOINT}
 
-base_volumes="/ /home /.snapshots /.swap /var"
-create_subvolumes $MOUNTPOINT $base_volumes
+# see https://www.jwillikers.com/btrfs-layout
 
-xdg_volumes="/ /.cache /.local /.var /.snapshots /Downloads /Development /Development/.snapshots"
-create_subvolumes ${MOUNTPOINT}/home/maxou $xdg_volumes
+btrfs subvolume create ${MOUNTPOINT}/@
+btrfs subvolume create ${MOUNTPOINT}/@home
+btrfs subvolume create ${MOUNTPOINT}/@var
+btrfs subvolume create ${MOUNTPOINT}/@snapshots
+btrfs subvolume create ${MOUNTPOINT}/@swap
+
+btrfs subvolume create ${MOUNTPOINT}/@home/$USERNAME
+btrfs subvolume create ${MOUNTPOINT}/@home/$USERNAME/.cache
+btrfs subvolume create ${MOUNTPOINT}/@home/$USERNAME/.local
+btrfs subvolume create ${MOUNTPOINT}/@home/$USERNAME/.var
+btrfs subvolume create ${MOUNTPOINT}/@home/$USERNAME/@snapshots
+btrfs subvolume create ${MOUNTPOINT}/@home/$USERNAME/Downloads
+btrfs subvolume create ${MOUNTPOINT}/@home/$USERNAME/Development
+btrfs subvolume create ${MOUNTPOINT}/@home/$USERNAME/Development/@snapshots
 
 umount ${MOUNTPOINT}
 
-# mount subvolumes
-
 mount -o subvol=@ ${ROOT_PART} ${MOUNTPOINT}
 
-mount_subvolumes $ROOT_PART $MOUNTPOINT $base_volumes
-mount_subvolumes $ROOT_PART $MOUNTPOINT/home/maxou $xdg_volumes
+mkdir -p \
+ ${MOUNTPOINT}/boot \
+ ${MOUNTPOINT}/home \
+ ${MOUNTPOINT}/var \
+ ${MOUNTPOINT}/.snapshots
 
-# mkdir -p \
-#  ${MOUNTPOINT}/.snapshots \
-#  ${MOUNTPOINT}/.swap
-#  ${MOUNTPOINT}/boot \
-#  ${MOUNTPOINT}/home \
-#  ${MOUNTPOINT}/var \
-# 
-# mount -o subvol=@snapshots ${ROOT_PART} ${MOUNTPOINT}/.snapshots
-# mount -o subvol=@swap ${ROOT_PART} ${MOUNTPOINT}/.swap
-# mount -o subvol=@var ${ROOT_PART} ${MOUNTPOINT}/var
 mount -t vfat ${BOOT_PART} ${MOUNTPOINT}/boot
 
-# mount -o subvol=@home ${ROOT_PART} ${MOUNTPOINT}/home
-# mount_xdg_subvolumes $ROOT_PART $MOUNTPOINT/home/maxou
+mount -o subvol=@home ${ROOT_PART} ${MOUNTPOINT}/home
+mount -o subvol=@var ${ROOT_PART} ${MOUNTPOINT}/var
+mount -o subvol=@snapshots ${ROOT_PART} ${MOUNTPOINT}/.snapshots
 
-#   cat << EOF > ${MOUNTPOINT}/fstab
-#   $(blkid ${ROOT_PART} | awk '{print $2}')   /       btrfs   subvol=@,ro,noatime 0 0
-#   $(blkid ${ROOT_PART} | awk '{print $2}')   /var    btrfs   subvol=@var,rw,noatime 0 0
-#   $(blkid ${ROOT_PART} | awk '{print $2}')   /home   btrfs   subvol=@var,rw,noatime 0 0
-#   $(blkid ${BOOT_PART} | awk '{print $2}')   /boot   vfat    rw,noatime,discard 0 2
-#   tmpfs /tmp tmpfs mode=1777,noatime,nosuid,nodev,size=2G 0 0
-#   $(blkid ${SWAP_PART} | awk '{print $2}')   swap    swap    rw,noatime,discard 0 0
-#   EOF
+mount -o subvol=@home/$USERNAME $ROOT_PART $MOUNTPOINT/home/$USERNAME
+mount -o subvol=@home/$USERNAME/.cache $ROOT_PART $MOUNTPOINT/home/$USERNAME/.cache
+mount -o subvol=@home/$USERNAME/.local $ROOT_PART $MOUNTPOINT/home/$USERNAME/.local
+mount -o subvol=@home/$USERNAME/.var $ROOT_PART $MOUNTPOINT/home/$USERNAME/.var
+mount -o subvol=@home/$USERNAME/@snapshots $ROOT_PART $MOUNTPOINT/home/$USERNAME/@snapshots
+mount -o subvol=@home/$USERNAME/Downloads $ROOT_PART $MOUNTPOINT/home/$USERNAME/Downloads
+mount -o subvol=@home/$USERNAME/Development $ROOT_PART $MOUNTPOINT/home/$USERNAME/Development
+mount -o subvol=@home/$USERNAME/Development/@snapshots $ROOT_PART $MOUNTPOINT/home/$USERNAME/Development/@snapshots
 
-setup-disk ${MOUNTPOINT}
+setup-disk $MOUNTPOINT
 
-#   apk -X https://dl-cdn.alpinelinux.org/alpine/latest-stable/main \
-#       -U --allow-untrusted \
-#       -p ${MOUNTPOINT} \
-#       --initdb add alpine-base
-#   
-#   mount -o bind /dev ${MOUNTPOINT}/dev
-#   mount -t proc none ${MOUNTPOINT}/proc
-#   mount -t sysfs sys ${MOUNTPOINT}/sys
-#   
-#   cp -L /etc/resolv.conf "${MOUNTPOINT}/etc/"
-#   chroot "${MOUNTPOINT}" /bin/sh
-#   
-#   cat << 'EOF' | chroot ${MOUNTPOINT} /bin/sh
-#       mount -a
-#       mv /etc/resolv.conf /tmp/
-#       ln -s /tmp/resolv.conf /etc/resolv.conf
-#   
-#       setup-apkrepos -c1
-#       setup-devd udev
-#   
-#       apk add -U \
-#           linux-firmware linux-lts btrfs-progs \
-#           openresolv \
-#           networkmanager networkmanager-wifi networkmanager-tui
-#   
-#       initfs_features=$(cat /etc/mkinitfs/mkinitfs.conf | awk -F '"' '{ print $2 }')
-#       echo "features=\"${initfs_features} btrfs\"" > /etc/mkinitfs/mkinitfs.conf
-#       mkinitfs
-#   
-#   EOF
+echo "MBR setup command: dd bs=440 conv=notrunc count=1 if=/usr/share/syslinux/gptmbr.bin of=$DEVICE"
